@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cats Gallery</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1>Cats Gallery</h1>
+        <button class="btn btn-add" id="add-cat-btn">Add Cat</button>
+      </header>
+
+      <!-- Cats Grid -->
+      <div id="cats-container" class="cats-grid">
+        <div class="loading">Loading cats...</div>
+      </div>
+    </div>
+
+    <!-- Modal for Add/Edit Cat -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <h2 id="modal-title">Add Cat</h2>
+        <form id="cat-form">
+          <input type="hidden" id="cat-id" />
+          <div class="form-group">
+            <label for="cat-name">Name</label>
+            <input
+              type="text"
+              id="cat-name"
+              placeholder="Enter cat's name"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="cat-pfp">Profile Picture URL</label>
+            <input
+              type="url"
+              id="cat-pfp"
+              placeholder="https://cataas.com/cat"
+            />
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-cancel" id="cancel-btn">
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-submit" id="submit-btn">
+              Add Cat
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
