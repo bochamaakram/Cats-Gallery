@@ -74,10 +74,13 @@ app.get("/cats/:id", (req, res) => {
 
 //post cats
 app.post("/cats", (req, res) => {
-  const { name, pfp } = req.body;
+  const { name, tag, pfp } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: "Name is required" });
+  }
+  if (!tag) {
+    return res.status(400).json({ error: "Tag is required" });
   }
 
   pool.getConnection((err, connection) => {
@@ -86,9 +89,9 @@ app.post("/cats", (req, res) => {
       return res.status(500).json({ error: "DB connection error" });
     }
     const query = pfp
-      ? "INSERT INTO cats (name, pfp) VALUES (?, ?)"
-      : "INSERT INTO cats (name) VALUES (?)";
-    const params = pfp ? [name, pfp] : [name];
+      ? "INSERT INTO cats (name, tag, pfp) VALUES (?, ?, ?)"
+      : "INSERT INTO cats (name, tag) VALUES (?, ?)";
+    const params = pfp ? [name, tag, pfp] : [name, tag];
     connection.query(query, params, (qerr, result) => {
       connection.release();
       if (qerr) {
@@ -141,7 +144,7 @@ app.put("/cats/:id", (req, res) => {
     const fields = [];
     const values = [];
     for (const key in updates) {
-      if (["name", "pfp"].includes(key)) {
+      if (["name", "tag", "pfp"].includes(key)) {
         fields.push(`${key} = ?`);
         values.push(updates[key]);
       }
@@ -169,6 +172,94 @@ app.put("/cats/:id", (req, res) => {
         message: `Record Num: ${catId} updated successfully (Fields updated: ${fields.length})`,
       });
     });
+  });
+});
+
+// User Signup
+app.post("/users/signup", (req, res) => {
+  const { name, password } = req.body;
+
+  if (!name || !password) {
+    return res.status(400).json({ error: "Name and password are required" });
+  }
+
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).json({ error: "DB connection error" });
+    }
+
+    // Check if user already exists
+    connection.query(
+      "SELECT id FROM users WHERE name = ?",
+      [name],
+      (qerr, rows) => {
+        if (qerr) {
+          connection.release();
+          console.log(qerr);
+          return res.status(500).json({ error: "Query error" });
+        }
+
+        if (rows.length > 0) {
+          connection.release();
+          return res.status(409).json({ error: "User already exists" });
+        }
+
+        // Create new user
+        connection.query(
+          "INSERT INTO users (name, password) VALUES (?, ?)",
+          [name, password],
+          (insertErr, result) => {
+            connection.release();
+            if (insertErr) {
+              console.log(insertErr);
+              return res.status(500).json({ error: "Query error" });
+            }
+            res.status(201).json({
+              message: "User created successfully",
+              id: result.insertId,
+            });
+          }
+        );
+      }
+    );
+  });
+});
+
+// User Login
+app.post("/users/login", (req, res) => {
+  const { name, password } = req.body;
+
+  if (!name || !password) {
+    return res.status(400).json({ error: "Name and password are required" });
+  }
+
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).json({ error: "DB connection error" });
+    }
+
+    connection.query(
+      "SELECT id, name, created_at FROM users WHERE name = ? AND password = ?",
+      [name, password],
+      (qerr, rows) => {
+        connection.release();
+        if (qerr) {
+          console.log(qerr);
+          return res.status(500).json({ error: "Query error" });
+        }
+
+        if (rows.length === 0) {
+          return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        res.json({
+          message: "Login successful",
+          user: rows[0],
+        });
+      }
+    );
   });
 });
 

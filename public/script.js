@@ -7,17 +7,33 @@ const modalOverlay = document.getElementById("modal-overlay");
 const modalTitle = document.getElementById("modal-title");
 const catIdInput = document.getElementById("cat-id");
 const catNameInput = document.getElementById("cat-name");
+const catTagInput = document.getElementById("cat-tag");
 const catPfpInput = document.getElementById("cat-pfp");
 const submitBtn = document.getElementById("submit-btn");
 const cancelBtn = document.getElementById("cancel-btn");
 const addCatBtn = document.getElementById("add-cat-btn");
 const catsContainer = document.getElementById("cats-container");
+const searchInput = document.getElementById("search-input");
+const tagFilter = document.getElementById("tag-filter");
+const prevBtn = document.getElementById("prev-btn");
+const nextBtn = document.getElementById("next-btn");
+const pageInfo = document.getElementById("page-info");
+const logoutBtn = document.getElementById("logout-btn");
 
 // State
 let isEditing = false;
+let allCats = [];
+let currentPage = 1;
+const catsPerPage = 8;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
+  // Check if user is logged in
+  const user = localStorage.getItem("user");
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
   loadCats();
 });
 
@@ -28,6 +44,17 @@ addCatBtn.addEventListener("click", openAddModal);
 modalOverlay.addEventListener("click", (e) => {
   if (e.target === modalOverlay) closeModal();
 });
+searchInput.addEventListener("input", handleSearch);
+tagFilter.addEventListener("change", handleTagFilter);
+prevBtn.addEventListener("click", () => changePage(-1));
+nextBtn.addEventListener("click", () => changePage(1));
+logoutBtn.addEventListener("click", logout);
+
+// Logout function
+function logout() {
+  localStorage.removeItem("user");
+  window.location.href = "login.html";
+}
 
 // Open modal for adding
 function openAddModal() {
@@ -46,6 +73,7 @@ function openEditModal(cat) {
   submitBtn.textContent = "Save Changes";
   catIdInput.value = cat.id;
   catNameInput.value = cat.name || "";
+  catTagInput.value = cat.tag || "";
   catPfpInput.value = cat.pfp || "";
   modalOverlay.classList.add("active");
 }
@@ -54,6 +82,74 @@ function openEditModal(cat) {
 function closeModal() {
   modalOverlay.classList.remove("active");
   catForm.reset();
+}
+
+// Handle search
+function handleSearch() {
+  currentPage = 1;
+  renderCurrentView();
+}
+
+// Handle tag filter
+function handleTagFilter() {
+  currentPage = 1;
+  renderCurrentView();
+}
+
+// Get filtered cats based on search and tag filter
+function getFilteredCats() {
+  const searchTerm = searchInput.value.toLowerCase().trim();
+  const selectedTag = tagFilter.value;
+
+  return allCats.filter((cat) => {
+    const matchesSearch =
+      !searchTerm ||
+      cat.name.toLowerCase().includes(searchTerm) ||
+      cat.tag.toLowerCase().includes(searchTerm);
+    const matchesTag = !selectedTag || cat.tag === selectedTag;
+    return matchesSearch && matchesTag;
+  });
+}
+
+// Populate tag filter dropdown with unique tags
+function populateTagFilter() {
+  const uniqueTags = [...new Set(allCats.map((cat) => cat.tag))].sort();
+  tagFilter.innerHTML =
+    '<option value="">All Tags</option>' +
+    uniqueTags
+      .map(
+        (tag) =>
+          `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`
+      )
+      .join("");
+}
+
+// Render current view with pagination
+function renderCurrentView() {
+  const filteredCats = getFilteredCats();
+  const totalPages = Math.ceil(filteredCats.length / catsPerPage) || 1;
+
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const startIndex = (currentPage - 1) * catsPerPage;
+  const endIndex = startIndex + catsPerPage;
+  const paginatedCats = filteredCats.slice(startIndex, endIndex);
+
+  renderCats(paginatedCats);
+  updatePagination(totalPages);
+}
+
+// Update pagination controls
+function updatePagination(totalPages) {
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  prevBtn.disabled = currentPage <= 1;
+  nextBtn.disabled = currentPage >= totalPages;
+}
+
+// Change page
+function changePage(direction) {
+  currentPage += direction;
+  renderCurrentView();
 }
 
 // Load all cats
@@ -65,7 +161,12 @@ async function loadCats() {
     if (!response.ok) throw new Error("Failed to fetch cats");
 
     const cats = await response.json();
-    renderCats(cats);
+    allCats = cats;
+    searchInput.value = "";
+    tagFilter.value = "";
+    currentPage = 1;
+    populateTagFilter();
+    renderCurrentView();
   } catch (error) {
     console.error("Error loading cats:", error);
     catsContainer.innerHTML =
@@ -99,15 +200,7 @@ function renderCats(cats) {
             }
             <div class="cat-info">
                 <h3 class="cat-name">${escapeHtml(cat.name)}</h3>
-                ${
-                  cat.pfp
-                    ? `<a href="${
-                        cat.pfp
-                      }" target="_blank" class="cat-link">${escapeHtml(
-                        cat.name
-                      )}</a>`
-                    : ""
-                }
+                <span class="cat-tag">#${escapeHtml(cat.tag)}</span>
                 <div class="cat-actions">
                     <button class="btn" onclick="editCat(${
                       cat.id
@@ -128,6 +221,7 @@ async function handleFormSubmit(e) {
   e.preventDefault();
 
   const name = catNameInput.value.trim();
+  const tag = catTagInput.value.trim();
   const pfp = catPfpInput.value.trim();
 
   if (!name) {
@@ -135,10 +229,15 @@ async function handleFormSubmit(e) {
     return;
   }
 
+  if (!tag) {
+    showToast("Please enter a tag", "error");
+    return;
+  }
+
   try {
     if (isEditing) {
       const catId = catIdInput.value;
-      const updateData = { name };
+      const updateData = { name, tag };
       if (pfp) updateData.pfp = pfp;
 
       const response = await fetch(`${API_URL}/${catId}`, {
@@ -150,7 +249,7 @@ async function handleFormSubmit(e) {
       if (!response.ok) throw new Error("Failed to update cat");
       showToast("Cat updated successfully!", "success");
     } else {
-      const postData = { name };
+      const postData = { name, tag };
       if (pfp) postData.pfp = pfp;
 
       const response = await fetch(API_URL, {

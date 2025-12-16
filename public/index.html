@@ -10,12 +10,37 @@
     <div class="container">
       <header class="header">
         <h1>Cats Gallery</h1>
-        <button class="btn btn-add" id="add-cat-btn">Add Cat</button>
+        <div class="filter-container">
+          <input
+            type="text"
+            id="search-input"
+            class="search-input"
+            placeholder="🔍 Search cats..."
+          />
+          <select id="tag-filter" class="tag-filter">
+            <option value="">All Tags</option>
+          </select>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-add" id="add-cat-btn">Add Cat</button>
+          <button class="btn btn-logout" id="logout-btn">Logout</button>
+        </div>
       </header>
 
       <!-- Cats Grid -->
       <div id="cats-container" class="cats-grid">
         <div class="loading">Loading cats...</div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination" id="pagination">
+        <button class="btn pagination-btn" id="prev-btn" disabled>
+          ← Previous
+        </button>
+        <span class="page-info" id="page-info">Page 1 of 1</span>
+        <button class="btn pagination-btn" id="next-btn" disabled>
+          Next →
+        </button>
       </div>
     </div>
 
@@ -31,6 +56,15 @@
               type="text"
               id="cat-name"
               placeholder="Enter cat's name"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="cat-tag">Tag</label>
+            <input
+              type="text"
+              id="cat-tag"
+              placeholder="Enter cat's tag"
               required
             />
           </div>
