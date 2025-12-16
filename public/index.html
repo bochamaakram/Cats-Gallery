@@ -9,22 +9,29 @@
   <body>
     <div class="container">
       <header class="header">
-        <h1>Cats Gallery</h1>
-        <div class="filter-container">
-          <input
-            type="text"
-            id="search-input"
-            class="search-input"
-            placeholder="🔍 Search cats..."
-          />
-          <select id="tag-filter" class="tag-filter">
-            <option value="">All Tags</option>
-          </select>
-        </div>
-        <div class="header-actions">
-          <button class="btn btn-add" id="add-cat-btn">Add Cat</button>
-          <button class="btn btn-logout" id="logout-btn">Logout</button>
-        </div>
+        <nav class="navbar">
+          <a href="index.html" class="logo">🐱 Cats Gallery</a>
+          <div class="nav-links">
+            <a href="index.html" class="nav-link active">Gallery</a>
+            <a href="info.html" class="nav-link">Info</a>
+            <a href="contact.html" class="nav-link">Contact</a>
+          </div>
+          <div class="filter-container">
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="🔍 Search cats..."
+            />
+            <select id="tag-filter" class="tag-filter">
+              <option value="">All Tags</option>
+            </select>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-add" id="add-cat-btn">Add Cat</button>
+            <button class="btn btn-logout" id="logout-btn">Logout</button>
+          </div>
+        </nav>
       </header>
 
       <!-- Cats Grid -->

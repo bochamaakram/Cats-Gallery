@@ -39,6 +39,52 @@ body {
   color: #333;
 }
 
+/* Navbar */
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.logo:hover {
+  color: #4a90d9;
+}
+
+/* Navigation Links */
+.nav-links {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-link {
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #555;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.nav-link:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.nav-link.active {
+  background: #4a90d9;
+  color: white;
+}
+
 /* Filter Container */
 .filter-container {
   flex: 1;

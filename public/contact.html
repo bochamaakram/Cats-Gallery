@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact Us - Cats Gallery</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <nav class="navbar">
+          <a href="index.html" class="logo">🐱 Cats Gallery</a>
+          <div class="nav-links">
+            <a href="index.html" class="nav-link">Gallery</a>
+            <a href="info.html" class="nav-link">Info</a>
+            <a href="contact.html" class="nav-link active">Contact</a>
+          </div>
+          <div>
+            <div class="header-actions">
+              <button
+                class="btn btn-add"
+                id="add-cat-btn"
+                onclick="window.location.href='index.html'"
+              >
+                Add Cat
+              </button>
+              <button class="btn btn-logout" id="logout-btn" onclick="logout()">
+                Logout
+              </button>
+            </div>
+          </div>
+        </nav>
+      </header>
+
+      <main class="page-content">
+        <section class="contact-section">
+          <div class="contact-intro">
+            <h2>Get in Touch</h2>
+            <p>
+              Have questions about our adorable cats? Want to adopt or just say
+              hello? We'd love to hear from you!
+            </p>
+          </div>
+
+          <div class="contact-grid">
+            <div class="contact-form-container">
+              <form id="contact-form" class="contact-form">
+                <div class="form-group">
+                  <label for="name">Your Name</label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Enter your name"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="email">Email Address</label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="subject">Subject</label>
+                  <input
+                    type="text"
+                    id="subject"
+                    name="subject"
+                    placeholder="What's this about?"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="message">Message</label>
+                  <textarea
+                    id="message"
+                    name="message"
+                    rows="5"
+                    placeholder="Write your message here..."
+                    required
+                  ></textarea>
+                </div>
+                <button type="submit" class="btn btn-submit">
+                  Send Message
+                </button>
+              </form>
+            </div>
+
+            <div class="contact-info-sidebar">
+              <div class="info-card">
+                <div class="info-icon">📍</div>
+                <h3>Our Location</h3>
+                <p>123 Cat Street<br />Meowville, MC 12345</p>
+              </div>
+              <div class="info-card">
+                <div class="info-icon">📧</div>
+                <h3>Email Us</h3>
+                <p>
+                  <a href="mailto:hello@catsgallery.com"
+                    >hello@catsgallery.com</a
+                  >
+                </p>
+              </div>
+              <div class="info-card">
+                <div class="info-icon">📞</div>
+                <h3>Call Us</h3>
+                <p>+1 (555) CAT-MEOW</p>
+              </div>
+              <div class="info-card">
+                <div class="info-icon">🕒</div>
+                <h3>Hours</h3>
+                <p>Mon - Fri: 9am - 6pm<br />Sat - Sun: 10am - 4pm</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      // Logout function
+      function logout() {
+        localStorage.removeItem("token");
+        window.location.href = "login.html";
+      }
+
+      // Contact form submission
+      document
+        .getElementById("contact-form")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          const toast = document.getElementById("toast");
+          toast.textContent =
+            "Message sent successfully! We'll get back to you soon.";
+          toast.className = "toast success show";
+
+          setTimeout(() => {
+            toast.classList.remove("show");
+          }, 3000);
+
+          this.reset();
+        });
+
+      // Search redirect to gallery
+      document
+        .getElementById("search-input")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            const query = this.value.trim();
+            if (query) {
+              window.location.href = `index.html?search=${encodeURIComponent(
+                query
+              )}`;
+            }
+          }
+        });
+
+      // Tag filter redirect to gallery
+      document
+        .getElementById("tag-filter")
+        .addEventListener("change", function () {
+          const tag = this.value;
+          if (tag) {
+            window.location.href = `index.html?tag=${encodeURIComponent(tag)}`;
+          }
+        });
+    </script>
+  </body>
+</html>

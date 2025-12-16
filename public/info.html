@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About Us - Cats Gallery</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <nav class="navbar">
+          <a href="index.html" class="logo">🐱 Cats Gallery</a>
+          <div class="nav-links">
+            <a href="index.html" class="nav-link">Gallery</a>
+            <a href="info.html" class="nav-link active">Info</a>
+            <a href="contact.html" class="nav-link">Contact</a>
+          </div>
+          <div class="header-actions">
+            <button
+              class="btn btn-add"
+              id="add-cat-btn"
+              onclick="window.location.href='index.html'"
+            >
+              Add Cat
+            </button>
+            <button class="btn btn-logout" id="logout-btn" onclick="logout()">
+              Logout
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      <main class="page-content">
+        <section class="info-section">
+          <div class="info-hero">
+            <h2>Welcome to Cats Gallery</h2>
+            <p class="hero-text">
+              Your ultimate destination for everything feline! We celebrate the
+              beauty, charm, and playful nature of cats from around the world.
+            </p>
+          </div>
+
+          <div class="features-grid">
+            <div class="feature-card">
+              <div class="feature-icon">🐱</div>
+              <h3>Our Mission</h3>
+              <p>
+                We're dedicated to connecting cat lovers with their perfect
+                furry companions. Our gallery showcases a diverse collection of
+                cats, each with their unique personality and charm.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">❤️</div>
+              <h3>What We Do</h3>
+              <p>
+                We curate a beautiful collection of cat profiles, making it easy
+                for you to browse, discover, and fall in love with cats. Whether
+                you're looking to adopt or just admire, we've got you covered.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">🌟</div>
+              <h3>Our Community</h3>
+              <p>
+                Join thousands of cat enthusiasts who share our passion. Add
+                your own cats to the gallery, connect with fellow cat lovers,
+                and be part of our growing community.
+              </p>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h2>By the Numbers</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-number">500+</span>
+                <span class="stat-label">Cats in Gallery</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number">1,200+</span>
+                <span class="stat-label">Happy Members</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number">50+</span>
+                <span class="stat-label">Cat Breeds</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number">24/7</span>
+                <span class="stat-label">Cuteness Available</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-section">
+            <h2>Frequently Asked Questions</h2>
+            <div class="faq-list">
+              <div class="faq-item">
+                <h3>How do I add my cat to the gallery?</h3>
+                <p>
+                  Simply log in to your account, click the "Add Cat" button, and
+                  fill in your cat's details including their name, tag, and a
+                  cute photo!
+                </p>
+              </div>
+              <div class="faq-item">
+                <h3>Is the Cats Gallery free to use?</h3>
+                <p>
+                  Yes! Browsing and adding cats to our gallery is completely
+                  free. We believe everyone should have access to cat cuteness.
+                </p>
+              </div>
+              <div class="faq-item">
+                <h3>Can I edit my cat's profile?</h3>
+                <p>
+                  Absolutely! You can update your cat's information at any time
+                  by clicking the "Edit" button on their card.
+                </p>
+              </div>
+              <div class="faq-item">
+                <h3>How can I contact you?</h3>
+                <p>
+                  Visit our <a href="contact.html">Contact page</a> to send us a
+                  message or find our contact information.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      // Logout function
+      function logout() {
+        localStorage.removeItem("token");
+        window.location.href = "login.html";
+      }
+
+      // Search redirect to gallery
+      document
+        .getElementById("search-input")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            const query = this.value.trim();
+            if (query) {
+              window.location.href = `index.html?search=${encodeURIComponent(
+                query
+              )}`;
+            }
+          }
+        });
+
+      // Tag filter redirect to gallery
+      document
+        .getElementById("tag-filter")
+        .addEventListener("change", function () {
+          const tag = this.value;
+          if (tag) {
+            window.location.href = `index.html?tag=${encodeURIComponent(tag)}`;
+          }
+        });
+    </script>
+  </body>
+</html>
