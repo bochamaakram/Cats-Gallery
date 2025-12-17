@@ -8,6 +8,5 @@ DB_SSL_CA=./isrgrootx1.pem
 
 # JWT Secret
 JWT_SECRET=cats_gallery_supersecret_key_2024
-
 # Server Port
 PORT=5000
