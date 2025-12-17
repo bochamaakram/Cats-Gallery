@@ -1,9 +1,11 @@
+require("dotenv").config();
 const express = require("express");
 const mysql = require("mysql2");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
-const post = "5000";
+const port = process.env.PORT || 5000;
 
 // Serve static files from public folder
 app.use(express.static(path.join(__dirname, "public")));
@@ -23,13 +25,17 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "rootpass",
-  database: "test",
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 4000,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  ssl: {
+    ca: fs.readFileSync(path.join(__dirname, process.env.DB_SSL_CA)),
+  },
 });
 
 //get cats
@@ -263,6 +269,6 @@ app.post("/users/login", (req, res) => {
   });
 });
 
-app.listen(post, () => {
-  console.log("Server is running on port " + post);
+app.listen(port, () => {
+  console.log("Server is running on port " + port);
 });
