@@ -1,34 +1,29 @@
-create database test;
-use test;
-#drop database test;
-CREATE TABLE cats (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    tag VARCHAR(50) NOT NULL,
-    pfp VARCHAR(255) DEFAULT 'https://cataas.com/cat',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
-INSERT INTO cats (name, tag, pfp)
-VALUES
-    ('Luna', 'Cute', 'https://cataas.com/cat/says/a'),
-    ('Milo', 'Orange', 'https://cataas.com/cat/says/b'),
-    ('Oliver', 'Tabby', 'https://cataas.com/cat/says/c'),
-    ('Leo', 'Playful', 'https://cataas.com/cat/says/d'),
-    ('Loki', 'Mischievous', 'https://cataas.com/cat/says/e'),
-    ('Bella', 'Princess', 'https://cataas.com/cat/says/f'),
-    ('Charlie', 'Friendly', 'https://cataas.com/cat/says/g'),
-    ('Willow', 'Sleepy', 'https://cataas.com/cat/says/h'),
-    ('Lucy', 'Cuddly', 'https://cataas.com/cat/says/i'),
-    ('Simba', 'Leader', 'https://cataas.com/cat/says/j'),
-    ('Max', 'Hunter', 'https://cataas.com/cat/says/k'),
-    ('Cleo', 'Elegant', 'https://cataas.com/cat/says/l'),
-    ('Oreo', 'Black & White', 'https://cataas.com/cat/says/m'),
-    ('Shadow', 'Ninja', 'https://cataas.com/cat/says/n'),
-    ('Kitty', 'Baby', 'https://cataas.com/cat/says/o'),
-    ('Pepper', 'Fast', 'https://cataas.com/cat/says/p');
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    password VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+-- Cats table
+CREATE TABLE IF NOT EXISTS cats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  pfp TEXT DEFAULT 'https://cataas.com/cat',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Sample cats data
+INSERT INTO cats (name, pfp) VALUES
+  ('Luna', 'https://cataas.com/cat/says/luna'),
+  ('Milo', 'https://cataas.com/cat/says/milo'),
+  ('Oliver', 'https://cataas.com/cat/says/oliver'),
+  ('Leo', 'https://cataas.com/cat/says/leo'),
+  ('Bella', 'https://cataas.com/cat/says/bella'),
+  ('Charlie', 'https://cataas.com/cat/says/charlie'),
+  ('Willow', 'https://cataas.com/cat/says/willow'),
+  ('Lucy', 'https://cataas.com/cat/says/lucy'),
+  ('Simba', 'https://cataas.com/cat/says/simba'),
+  ('Max', 'https://cataas.com/cat/says/max');
