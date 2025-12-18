@@ -24,18 +24,42 @@ app.use((req, res, next) => {
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
+// Database configuration - supports JAWSDB_URL or individual env vars
+let dbConfig;
+
+if (process.env.JAWSDB_URL) {
+  // Parse JAWSDB_URL: mysql://user:password@host:port/database
+  const url = new URL(process.env.JAWSDB_URL);
+  dbConfig = {
+    host: url.hostname,
+    user: url.username,
+    password: url.password,
+    database: url.pathname.slice(1), // Remove leading "/"
+    port: url.port || 4000,
+  };
+} else {
+  // Fallback to individual env vars
+  dbConfig = {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 4000,
+  };
+
+  // Add SSL if configured
+  if (process.env.DB_SSL_CA) {
+    dbConfig.ssl = {
+      ca: fs.readFileSync(path.join(__dirname, process.env.DB_SSL_CA)),
+    };
+  }
+}
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 4000,
+  ...dbConfig,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: {
-    ca: fs.readFileSync(path.join(__dirname, process.env.DB_SSL_CA)),
-  },
 });
 
 //get cats
