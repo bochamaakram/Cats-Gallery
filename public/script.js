@@ -7,14 +7,12 @@ const modalOverlay = document.getElementById("modal-overlay");
 const modalTitle = document.getElementById("modal-title");
 const catIdInput = document.getElementById("cat-id");
 const catNameInput = document.getElementById("cat-name");
-const catTagInput = document.getElementById("cat-tag");
 const catPfpInput = document.getElementById("cat-pfp");
 const submitBtn = document.getElementById("submit-btn");
 const cancelBtn = document.getElementById("cancel-btn");
 const addCatBtn = document.getElementById("add-cat-btn");
 const catsContainer = document.getElementById("cats-container");
 const searchInput = document.getElementById("search-input");
-const tagFilter = document.getElementById("tag-filter");
 const prevBtn = document.getElementById("prev-btn");
 const nextBtn = document.getElementById("next-btn");
 const pageInfo = document.getElementById("page-info");
@@ -24,13 +22,27 @@ const logoutBtn = document.getElementById("logout-btn");
 let isEditing = false;
 let allCats = [];
 let currentPage = 1;
-const catsPerPage = 8;
+const catsPerPage = 10;
+let totalPages = 1;
+
+// Get auth token
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+// Auth headers
+function authHeaders() {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${getToken()}`,
+  };
+}
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
   // Check if user is logged in
-  const user = localStorage.getItem("user");
-  if (!user) {
+  const token = getToken();
+  if (!token) {
     window.location.href = "login.html";
     return;
   }
@@ -45,13 +57,13 @@ modalOverlay.addEventListener("click", (e) => {
   if (e.target === modalOverlay) closeModal();
 });
 searchInput.addEventListener("input", handleSearch);
-tagFilter.addEventListener("change", handleTagFilter);
 prevBtn.addEventListener("click", () => changePage(-1));
 nextBtn.addEventListener("click", () => changePage(1));
 logoutBtn.addEventListener("click", logout);
 
 // Logout function
 function logout() {
+  localStorage.removeItem("token");
   localStorage.removeItem("user");
   window.location.href = "login.html";
 }
@@ -73,7 +85,6 @@ function openEditModal(cat) {
   submitBtn.textContent = "Save Changes";
   catIdInput.value = cat.id;
   catNameInput.value = cat.name || "";
-  catTagInput.value = cat.tag || "";
   catPfpInput.value = cat.pfp || "";
   modalOverlay.classList.add("active");
 }
@@ -84,63 +95,27 @@ function closeModal() {
   catForm.reset();
 }
 
-// Handle search
+// Handle search - filter locally
 function handleSearch() {
-  currentPage = 1;
   renderCurrentView();
 }
 
-// Handle tag filter
-function handleTagFilter() {
-  currentPage = 1;
-  renderCurrentView();
-}
-
-// Get filtered cats based on search and tag filter
+// Get filtered cats based on search
 function getFilteredCats() {
   const searchTerm = searchInput.value.toLowerCase().trim();
-  const selectedTag = tagFilter.value;
+  if (!searchTerm) return allCats;
 
-  return allCats.filter((cat) => {
-    const matchesSearch =
-      !searchTerm ||
-      cat.name.toLowerCase().includes(searchTerm) ||
-      cat.tag.toLowerCase().includes(searchTerm);
-    const matchesTag = !selectedTag || cat.tag === selectedTag;
-    return matchesSearch && matchesTag;
-  });
+  return allCats.filter((cat) => cat.name.toLowerCase().includes(searchTerm));
 }
 
-// Populate tag filter dropdown with unique tags
-function populateTagFilter() {
-  const uniqueTags = [...new Set(allCats.map((cat) => cat.tag))].sort();
-  tagFilter.innerHTML =
-    '<option value="">All Tags</option>' +
-    uniqueTags
-      .map(
-        (tag) =>
-          `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`
-      )
-      .join("");
-}
-
-// Render current view with pagination
+// Render current view
 function renderCurrentView() {
   const filteredCats = getFilteredCats();
-  const totalPages = Math.ceil(filteredCats.length / catsPerPage) || 1;
-
-  if (currentPage > totalPages) currentPage = totalPages;
-
-  const startIndex = (currentPage - 1) * catsPerPage;
-  const endIndex = startIndex + catsPerPage;
-  const paginatedCats = filteredCats.slice(startIndex, endIndex);
-
-  renderCats(paginatedCats);
-  updatePagination(totalPages);
+  renderCats(filteredCats);
 }
 
 // Update pagination controls
-function updatePagination(totalPages) {
+function updatePagination() {
   pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
   prevBtn.disabled = currentPage <= 1;
   nextBtn.disabled = currentPage >= totalPages;
@@ -149,7 +124,7 @@ function updatePagination(totalPages) {
 // Change page
 function changePage(direction) {
   currentPage += direction;
-  renderCurrentView();
+  loadCats();
 }
 
 // Load all cats
@@ -157,15 +132,18 @@ async function loadCats() {
   catsContainer.innerHTML = '<div class="loading">Loading cats...</div>';
 
   try {
-    const response = await fetch(API_URL);
+    const response = await fetch(
+      `${API_URL}?page=${currentPage}&limit=${catsPerPage}`
+    );
     if (!response.ok) throw new Error("Failed to fetch cats");
 
-    const cats = await response.json();
-    allCats = cats;
+    const data = await response.json();
+    allCats = data.cats;
+    totalPages = data.pagination.totalPages;
+    currentPage = data.pagination.page;
+
     searchInput.value = "";
-    tagFilter.value = "";
-    currentPage = 1;
-    populateTagFilter();
+    updatePagination();
     renderCurrentView();
   } catch (error) {
     console.error("Error loading cats:", error);
@@ -185,10 +163,6 @@ function renderCats(cats) {
 
   catsContainer.innerHTML = cats
     .map((cat) => {
-      const pfpDisplay = cat.pfp
-        ? cat.pfp.substring(0, 40) + (cat.pfp.length > 40 ? "..." : "")
-        : "";
-
       return `
         <div class="cat-card" data-id="${cat.id}">
             ${
@@ -200,7 +174,6 @@ function renderCats(cats) {
             }
             <div class="cat-info">
                 <h3 class="cat-name">${escapeHtml(cat.name)}</h3>
-                <span class="cat-tag">#${escapeHtml(cat.tag)}</span>
                 <div class="cat-actions">
                     <button class="btn" onclick="editCat(${
                       cat.id
@@ -221,7 +194,6 @@ async function handleFormSubmit(e) {
   e.preventDefault();
 
   const name = catNameInput.value.trim();
-  const tag = catTagInput.value.trim();
   const pfp = catPfpInput.value.trim();
 
   if (!name) {
@@ -229,32 +201,27 @@ async function handleFormSubmit(e) {
     return;
   }
 
-  if (!tag) {
-    showToast("Please enter a tag", "error");
-    return;
-  }
-
   try {
     if (isEditing) {
       const catId = catIdInput.value;
-      const updateData = { name, tag };
+      const updateData = { name };
       if (pfp) updateData.pfp = pfp;
 
       const response = await fetch(`${API_URL}/${catId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify(updateData),
       });
 
       if (!response.ok) throw new Error("Failed to update cat");
       showToast("Cat updated successfully!", "success");
     } else {
-      const postData = { name, tag };
+      const postData = { name };
       if (pfp) postData.pfp = pfp;
 
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify(postData),
       });
 
@@ -294,6 +261,7 @@ async function deleteCat(id) {
   try {
     const response = await fetch(`${API_URL}/${id}`, {
       method: "DELETE",
+      headers: authHeaders(),
     });
 
     if (!response.ok) throw new Error("Failed to delete cat");

@@ -1,5 +1,5 @@
 // API Base URL
-const API_URL = "/users";
+const API_URL = "/auth";
 
 // DOM Elements
 const tabBtns = document.querySelectorAll(".tab-btn");
@@ -34,10 +34,10 @@ tabBtns.forEach((btn) => {
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const name = document.getElementById("login-name").value.trim();
+  const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-password").value;
 
-  if (!name || !password) {
+  if (!email || !password) {
     showMessage("Please fill in all fields", "error");
     return;
   }
@@ -46,7 +46,7 @@ loginForm.addEventListener("submit", async (e) => {
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     const data = await response.json();
@@ -58,7 +58,8 @@ loginForm.addEventListener("submit", async (e) => {
 
     showMessage("Login successful! Redirecting...", "success");
 
-    // Store user info (simple localStorage for demo)
+    // Store token and user info
+    localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
 
     // Redirect to main page after a short delay
@@ -75,11 +76,12 @@ loginForm.addEventListener("submit", async (e) => {
 signupForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const name = document.getElementById("signup-name").value.trim();
+  const username = document.getElementById("signup-username").value.trim();
+  const email = document.getElementById("signup-email").value.trim();
   const password = document.getElementById("signup-password").value;
   const confirm = document.getElementById("signup-confirm").value;
 
-  if (!name || !password || !confirm) {
+  if (!username || !email || !password || !confirm) {
     showMessage("Please fill in all fields", "error");
     return;
   }
@@ -95,10 +97,10 @@ signupForm.addEventListener("submit", async (e) => {
   }
 
   try {
-    const response = await fetch(`${API_URL}/signup`, {
+    const response = await fetch(`${API_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ username, email, password }),
     });
 
     const data = await response.json();
@@ -114,12 +116,13 @@ signupForm.addEventListener("submit", async (e) => {
     const loginResponse = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     const loginData = await loginResponse.json();
 
     if (loginResponse.ok) {
+      localStorage.setItem("token", loginData.token);
       localStorage.setItem("user", JSON.stringify(loginData.user));
       setTimeout(() => {
         window.location.href = "index.html";

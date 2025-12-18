@@ -1,298 +1,247 @@
-require("dotenv").config();
-const express = require("express");
-const mysql = require("mysql2");
-const path = require("path");
-const fs = require("fs");
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { serveStatic } from "hono/cloudflare-workers";
+import bcrypt from "bcryptjs";
+import { sign, verify } from "hono/jwt";
 
-const app = express();
-const port = process.env.PORT || 5000;
-
-// Serve static files from public folder
-app.use(express.static(path.join(__dirname, "public")));
+const app = new Hono();
 
 // CORS middleware
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
+app.use("/*", cors());
+
+// Serve static files from public folder
+app.use("/*", serveStatic({ root: "./public" }));
+
+// JWT Secret (set in Cloudflare Dashboard)
+const getJwtSecret = (c) => c.env.JWT_SECRET || "default-secret-change-me";
+
+// Auth middleware
+const authMiddleware = async (c, next) => {
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return c.json({ error: "Unauthorized" }, 401);
   }
-  next();
-});
 
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
-
-// Database configuration - supports JAWSDB_URL or individual env vars
-let dbConfig;
-
-if (process.env.JAWSDB_URL) {
-  // Parse JAWSDB_URL: mysql://user:password@host:port/database
-  const url = new URL(process.env.JAWSDB_URL);
-  dbConfig = {
-    host: url.hostname,
-    user: url.username,
-    password: url.password,
-    database: url.pathname.slice(1), // Remove leading "/"
-    port: url.port || 4000,
-  };
-} else {
-  // Fallback to individual env vars
-  dbConfig = {
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT || 4000,
-  };
-
-  // Add SSL if configured
-  if (process.env.DB_SSL_CA) {
-    dbConfig.ssl = {
-      ca: fs.readFileSync(path.join(__dirname, process.env.DB_SSL_CA)),
-    };
+  const token = authHeader.split(" ")[1];
+  try {
+    const payload = await verify(token, getJwtSecret(c));
+    c.set("user", payload);
+    await next();
+  } catch (error) {
+    return c.json({ error: "Invalid token" }, 401);
   }
-}
+};
 
-const pool = mysql.createPool({
-  ...dbConfig,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+// ==================== AUTH ROUTES ====================
 
-//get cats
-app.get("/cats", (req, res) => {
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).json({ error: "DB connection error" });
+// Register
+app.post("/auth/register", async (c) => {
+  const { username, email, password } = await c.req.json();
+
+  if (!username || !email || !password) {
+    return c.json({ error: "Username, email, and password are required" }, 400);
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await c.env.DB.prepare(
+      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)"
+    )
+      .bind(username, email, hashedPassword)
+      .run();
+
+    return c.json(
+      { message: "User created successfully", id: result.meta.last_row_id },
+      201
+    );
+  } catch (error) {
+    if (error.message.includes("UNIQUE constraint failed")) {
+      return c.json({ error: "Username or email already exists" }, 409);
     }
-    connection.query("SELECT * FROM cats", (qerr, rows) => {
-      connection.release();
-      if (qerr) {
-        console.log(qerr);
-        return res.status(500).json({ error: "Query error" });
-      }
-      res.json(rows);
-    });
-  });
+    return c.json({ error: "Database error", details: error.message }, 500);
+  }
 });
-//get cat by id
-app.get("/cats/:id", (req, res) => {
-  const { id } = req.params;
 
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).json({ error: "DB connection error" });
+// Login
+app.post("/auth/login", async (c) => {
+  const { email, password } = await c.req.json();
+
+  if (!email || !password) {
+    return c.json({ error: "Email and password are required" }, 400);
+  }
+
+  try {
+    const user = await c.env.DB.prepare("SELECT * FROM users WHERE email = ?")
+      .bind(email)
+      .first();
+
+    if (!user) {
+      return c.json({ error: "Invalid credentials" }, 401);
     }
-    connection.query("SELECT * FROM cats WHERE id = ?", [id], (qerr, rows) => {
-      connection.release();
-      if (qerr) {
-        console.log(qerr);
-        return res.status(500).json({ error: "Query error" });
-      }
-      if (rows.length === 0) {
-        return res.status(404).json({ error: "Cat not found" });
-      }
-      res.json(rows[0]);
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return c.json({ error: "Invalid credentials" }, 401);
+    }
+
+    const token = await sign(
+      { id: user.id, username: user.username, email: user.email },
+      getJwtSecret(c)
+    );
+
+    return c.json({
+      message: "Login successful",
+      token,
+      user: { id: user.id, username: user.username, email: user.email },
     });
-  });
+  } catch (error) {
+    return c.json({ error: "Database error", details: error.message }, 500);
+  }
 });
 
-//post cats
-app.post("/cats", (req, res) => {
-  const { name, tag, pfp } = req.body;
+// Get current user
+app.get("/auth/me", authMiddleware, async (c) => {
+  const user = c.get("user");
+  return c.json({ user });
+});
+
+// ==================== CATS ROUTES ====================
+
+// Get all cats (paginated)
+app.get("/cats", async (c) => {
+  const page = parseInt(c.req.query("page")) || 1;
+  const limit = parseInt(c.req.query("limit")) || 10;
+  const offset = (page - 1) * limit;
+
+  try {
+    const cats = await c.env.DB.prepare("SELECT * FROM cats LIMIT ? OFFSET ?")
+      .bind(limit, offset)
+      .all();
+
+    const countResult = await c.env.DB.prepare(
+      "SELECT COUNT(*) as total FROM cats"
+    ).first();
+
+    return c.json({
+      cats: cats.results,
+      pagination: {
+        page,
+        limit,
+        total: countResult.total,
+        totalPages: Math.ceil(countResult.total / limit),
+      },
+    });
+  } catch (error) {
+    return c.json({ error: "Database error", details: error.message }, 500);
+  }
+});
+
+// Get cat by ID
+app.get("/cats/:id", async (c) => {
+  const id = c.req.param("id");
+
+  try {
+    const cat = await c.env.DB.prepare("SELECT * FROM cats WHERE id = ?")
+      .bind(id)
+      .first();
+
+    if (!cat) {
+      return c.json({ error: "Cat not found" }, 404);
+    }
+
+    return c.json(cat);
+  } catch (error) {
+    return c.json({ error: "Database error", details: error.message }, 500);
+  }
+});
+
+// Create cat (auth required)
+app.post("/cats", authMiddleware, async (c) => {
+  const { name, pfp } = await c.req.json();
 
   if (!name) {
-    return res.status(400).json({ error: "Name is required" });
-  }
-  if (!tag) {
-    return res.status(400).json({ error: "Tag is required" });
+    return c.json({ error: "Name is required" }, 400);
   }
 
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).json({ error: "DB connection error" });
-    }
-    const query = pfp
-      ? "INSERT INTO cats (name, tag, pfp) VALUES (?, ?, ?)"
-      : "INSERT INTO cats (name, tag) VALUES (?, ?)";
-    const params = pfp ? [name, tag, pfp] : [name, tag];
-    connection.query(query, params, (qerr, result) => {
-      connection.release();
-      if (qerr) {
-        console.log(qerr);
-        return res.status(500).json({ error: "Query error" });
-      }
-      res
-        .status(201)
-        .json({ message: "Cat added successfully", id: result.insertId });
-    });
-  });
-});
+  try {
+    const result = await c.env.DB.prepare(
+      "INSERT INTO cats (name, pfp) VALUES (?, ?)"
+    )
+      .bind(name, pfp || null)
+      .run();
 
-// Delete a record
-app.delete("/cats/:id", (req, res) => {
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.error("DB connection error:", err);
-      return res.status(500).json({ error: "DB connection error" });
-    }
-    connection.query(
-      "DELETE FROM cats where id = ?",
-      [req.params.id],
-      (qErr, rows) => {
-        connection.release();
-        if (qErr) {
-          console.error("Query error:", qErr);
-          return res.status(500).json({ error: "Query error" });
-        }
-        res.json({
-          message: `Record Num: ${req.params.id} deleted successfully`,
-        });
-      }
+    return c.json(
+      { message: "Cat created successfully", id: result.meta.last_row_id },
+      201
     );
-  });
+  } catch (error) {
+    return c.json({ error: "Database error", details: error.message }, 500);
+  }
 });
 
-// Update a record by ID (Dynamic Update)
-app.put("/cats/:id", (req, res) => {
-  const catId = req.params.id;
-  const updates = req.body;
+// Update cat (auth required)
+app.put("/cats/:id", authMiddleware, async (c) => {
+  const id = c.req.param("id");
+  const updates = await c.req.json();
+
   if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ error: "No fields provided for update." });
-  }
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).json({ error: "DB connection error" });
-    }
-    const fields = [];
-    const values = [];
-    for (const key in updates) {
-      if (["name", "tag", "pfp"].includes(key)) {
-        fields.push(`${key} = ?`);
-        values.push(updates[key]);
-      }
-    }
-    values.push(catId);
-    const query = `
-      UPDATE cats 
-      SET ${fields.join(", ")} 
-      WHERE id = ?
-    `;
-    connection.query(query, values, (qerr, result) => {
-      connection.release();
-
-      if (qerr) {
-        console.log(qerr);
-        return res.status(500).json({ error: "Query error" });
-      }
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({
-          message: `Cat with ID ${catId} not found or no change was made.`,
-        });
-      }
-      res.json({
-        message: `Record Num: ${catId} updated successfully (Fields updated: ${fields.length})`,
-      });
-    });
-  });
-});
-
-// User Signup
-app.post("/users/signup", (req, res) => {
-  const { name, password } = req.body;
-
-  if (!name || !password) {
-    return res.status(400).json({ error: "Name and password are required" });
+    return c.json({ error: "No fields provided for update" }, 400);
   }
 
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).json({ error: "DB connection error" });
+  const fields = [];
+  const values = [];
+  for (const key of ["name", "pfp"]) {
+    if (updates[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      values.push(updates[key]);
     }
-
-    // Check if user already exists
-    connection.query(
-      "SELECT id FROM users WHERE name = ?",
-      [name],
-      (qerr, rows) => {
-        if (qerr) {
-          connection.release();
-          console.log(qerr);
-          return res.status(500).json({ error: "Query error" });
-        }
-
-        if (rows.length > 0) {
-          connection.release();
-          return res.status(409).json({ error: "User already exists" });
-        }
-
-        // Create new user
-        connection.query(
-          "INSERT INTO users (name, password) VALUES (?, ?)",
-          [name, password],
-          (insertErr, result) => {
-            connection.release();
-            if (insertErr) {
-              console.log(insertErr);
-              return res.status(500).json({ error: "Query error" });
-            }
-            res.status(201).json({
-              message: "User created successfully",
-              id: result.insertId,
-            });
-          }
-        );
-      }
-    );
-  });
-});
-
-// User Login
-app.post("/users/login", (req, res) => {
-  const { name, password } = req.body;
-
-  if (!name || !password) {
-    return res.status(400).json({ error: "Name and password are required" });
   }
 
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).json({ error: "DB connection error" });
+  if (fields.length === 0) {
+    return c.json({ error: "No valid fields provided for update" }, 400);
+  }
+
+  values.push(id);
+
+  try {
+    const result = await c.env.DB.prepare(
+      `UPDATE cats SET ${fields.join(", ")} WHERE id = ?`
+    )
+      .bind(...values)
+      .run();
+
+    if (result.meta.changes === 0) {
+      return c.json({ error: "Cat not found" }, 404);
     }
 
-    connection.query(
-      "SELECT id, name, created_at FROM users WHERE name = ? AND password = ?",
-      [name, password],
-      (qerr, rows) => {
-        connection.release();
-        if (qerr) {
-          console.log(qerr);
-          return res.status(500).json({ error: "Query error" });
-        }
-
-        if (rows.length === 0) {
-          return res.status(401).json({ error: "Invalid credentials" });
-        }
-
-        res.json({
-          message: "Login successful",
-          user: rows[0],
-        });
-      }
-    );
-  });
+    return c.json({ message: "Cat updated successfully" });
+  } catch (error) {
+    return c.json({ error: "Database error", details: error.message }, 500);
+  }
 });
 
-app.listen(port, () => {
-  console.log("Server is running on port " + port);
+// Delete cat (auth required)
+app.delete("/cats/:id", authMiddleware, async (c) => {
+  const id = c.req.param("id");
+
+  try {
+    const result = await c.env.DB.prepare("DELETE FROM cats WHERE id = ?")
+      .bind(id)
+      .run();
+
+    if (result.meta.changes === 0) {
+      return c.json({ error: "Cat not found" }, 404);
+    }
+
+    return c.json({ message: "Cat deleted successfully" });
+  } catch (error) {
+    return c.json({ error: "Database error", details: error.message }, 500);
+  }
 });
+
+// Health check
+app.get("/health", (c) => {
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+export default app;
