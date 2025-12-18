@@ -7,7 +7,7 @@
 node_modules/
 
 # SSL Certificates
-*.pem
+isrgrootx1.pem
 
 # Logs
 logs/
