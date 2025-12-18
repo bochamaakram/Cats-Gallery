@@ -1,19 +1,28 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { serveStatic } from "hono/cloudflare-workers";
-import bcrypt from "bcryptjs";
-import { sign, verify } from "hono/jwt";
+import { jwt, sign, verify } from "hono/jwt";
 
 const app = new Hono();
 
 // CORS middleware
 app.use("/*", cors());
 
-// Serve static files from public folder
-app.use("/*", serveStatic({ root: "./public" }));
-
-// JWT Secret (set in Cloudflare Dashboard)
+// JWT Secret
 const getJwtSecret = (c) => c.env.JWT_SECRET || "default-secret-change-me";
+
+// Simple password hashing using Web Crypto API (Workers-compatible)
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function verifyPassword(password, hash) {
+  const passwordHash = await hashPassword(password);
+  return passwordHash === hash;
+}
 
 // Auth middleware
 const authMiddleware = async (c, next) => {
@@ -36,14 +45,18 @@ const authMiddleware = async (c, next) => {
 
 // Register
 app.post("/auth/register", async (c) => {
-  const { username, email, password } = await c.req.json();
-
-  if (!username || !email || !password) {
-    return c.json({ error: "Username, email, and password are required" }, 400);
-  }
-
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const body = await c.req.json();
+    const { username, email, password } = body;
+
+    if (!username || !email || !password) {
+      return c.json(
+        { error: "Username, email, and password are required" },
+        400
+      );
+    }
+
+    const hashedPassword = await hashPassword(password);
     const result = await c.env.DB.prepare(
       "INSERT INTO users (username, email, password) VALUES (?, ?, ?)"
     )
@@ -55,22 +68,23 @@ app.post("/auth/register", async (c) => {
       201
     );
   } catch (error) {
-    if (error.message.includes("UNIQUE constraint failed")) {
+    if (error.message && error.message.includes("UNIQUE")) {
       return c.json({ error: "Username or email already exists" }, 409);
     }
-    return c.json({ error: "Database error", details: error.message }, 500);
+    return c.json({ error: "Server error", details: error.message }, 500);
   }
 });
 
 // Login
 app.post("/auth/login", async (c) => {
-  const { email, password } = await c.req.json();
-
-  if (!email || !password) {
-    return c.json({ error: "Email and password are required" }, 400);
-  }
-
   try {
+    const body = await c.req.json();
+    const { email, password } = body;
+
+    if (!email || !password) {
+      return c.json({ error: "Email and password are required" }, 400);
+    }
+
     const user = await c.env.DB.prepare("SELECT * FROM users WHERE email = ?")
       .bind(email)
       .first();
@@ -79,7 +93,7 @@ app.post("/auth/login", async (c) => {
       return c.json({ error: "Invalid credentials" }, 401);
     }
 
-    const isValid = await bcrypt.compare(password, user.password);
+    const isValid = await verifyPassword(password, user.password);
     if (!isValid) {
       return c.json({ error: "Invalid credentials" }, 401);
     }
@@ -95,7 +109,7 @@ app.post("/auth/login", async (c) => {
       user: { id: user.id, username: user.username, email: user.email },
     });
   } catch (error) {
-    return c.json({ error: "Database error", details: error.message }, 500);
+    return c.json({ error: "Server error", details: error.message }, 500);
   }
 });
 
@@ -109,11 +123,11 @@ app.get("/auth/me", authMiddleware, async (c) => {
 
 // Get all cats (paginated)
 app.get("/cats", async (c) => {
-  const page = parseInt(c.req.query("page")) || 1;
-  const limit = parseInt(c.req.query("limit")) || 10;
-  const offset = (page - 1) * limit;
-
   try {
+    const page = parseInt(c.req.query("page")) || 1;
+    const limit = parseInt(c.req.query("limit")) || 10;
+    const offset = (page - 1) * limit;
+
     const cats = await c.env.DB.prepare("SELECT * FROM cats LIMIT ? OFFSET ?")
       .bind(limit, offset)
       .all();
@@ -132,15 +146,14 @@ app.get("/cats", async (c) => {
       },
     });
   } catch (error) {
-    return c.json({ error: "Database error", details: error.message }, 500);
+    return c.json({ error: "Server error", details: error.message }, 500);
   }
 });
 
 // Get cat by ID
 app.get("/cats/:id", async (c) => {
-  const id = c.req.param("id");
-
   try {
+    const id = c.req.param("id");
     const cat = await c.env.DB.prepare("SELECT * FROM cats WHERE id = ?")
       .bind(id)
       .first();
@@ -151,19 +164,20 @@ app.get("/cats/:id", async (c) => {
 
     return c.json(cat);
   } catch (error) {
-    return c.json({ error: "Database error", details: error.message }, 500);
+    return c.json({ error: "Server error", details: error.message }, 500);
   }
 });
 
 // Create cat (auth required)
 app.post("/cats", authMiddleware, async (c) => {
-  const { name, pfp } = await c.req.json();
-
-  if (!name) {
-    return c.json({ error: "Name is required" }, 400);
-  }
-
   try {
+    const body = await c.req.json();
+    const { name, pfp } = body;
+
+    if (!name) {
+      return c.json({ error: "Name is required" }, 400);
+    }
+
     const result = await c.env.DB.prepare(
       "INSERT INTO cats (name, pfp) VALUES (?, ?)"
     )
@@ -175,35 +189,35 @@ app.post("/cats", authMiddleware, async (c) => {
       201
     );
   } catch (error) {
-    return c.json({ error: "Database error", details: error.message }, 500);
+    return c.json({ error: "Server error", details: error.message }, 500);
   }
 });
 
 // Update cat (auth required)
 app.put("/cats/:id", authMiddleware, async (c) => {
-  const id = c.req.param("id");
-  const updates = await c.req.json();
-
-  if (Object.keys(updates).length === 0) {
-    return c.json({ error: "No fields provided for update" }, 400);
-  }
-
-  const fields = [];
-  const values = [];
-  for (const key of ["name", "pfp"]) {
-    if (updates[key] !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(updates[key]);
-    }
-  }
-
-  if (fields.length === 0) {
-    return c.json({ error: "No valid fields provided for update" }, 400);
-  }
-
-  values.push(id);
-
   try {
+    const id = c.req.param("id");
+    const updates = await c.req.json();
+
+    if (Object.keys(updates).length === 0) {
+      return c.json({ error: "No fields provided for update" }, 400);
+    }
+
+    const fields = [];
+    const values = [];
+    for (const key of ["name", "pfp"]) {
+      if (updates[key] !== undefined) {
+        fields.push(`${key} = ?`);
+        values.push(updates[key]);
+      }
+    }
+
+    if (fields.length === 0) {
+      return c.json({ error: "No valid fields provided for update" }, 400);
+    }
+
+    values.push(id);
+
     const result = await c.env.DB.prepare(
       `UPDATE cats SET ${fields.join(", ")} WHERE id = ?`
     )
@@ -216,15 +230,14 @@ app.put("/cats/:id", authMiddleware, async (c) => {
 
     return c.json({ message: "Cat updated successfully" });
   } catch (error) {
-    return c.json({ error: "Database error", details: error.message }, 500);
+    return c.json({ error: "Server error", details: error.message }, 500);
   }
 });
 
 // Delete cat (auth required)
 app.delete("/cats/:id", authMiddleware, async (c) => {
-  const id = c.req.param("id");
-
   try {
+    const id = c.req.param("id");
     const result = await c.env.DB.prepare("DELETE FROM cats WHERE id = ?")
       .bind(id)
       .run();
@@ -235,7 +248,7 @@ app.delete("/cats/:id", authMiddleware, async (c) => {
 
     return c.json({ message: "Cat deleted successfully" });
   } catch (error) {
-    return c.json({ error: "Database error", details: error.message }, 500);
+    return c.json({ error: "Server error", details: error.message }, 500);
   }
 });
 
@@ -243,5 +256,8 @@ app.delete("/cats/:id", authMiddleware, async (c) => {
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// Serve static files - redirect root to index.html
+app.get("/", (c) => c.redirect("/index.html"));
 
 export default app;
