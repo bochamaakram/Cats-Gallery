@@ -1,5 +1,5 @@
 // API Base URL
-const API_URL = "https://cats-gallery-chi.vercel.app/cats";
+const API_URL = "/cats";
 
 // DOM Elements
 const catForm = document.getElementById("cat-form");

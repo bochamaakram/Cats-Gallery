@@ -1,5 +1,5 @@
 // API Base URL
-const API_URL = "/api/users";
+const API_URL = "/users";
 
 // DOM Elements
 const tabBtns = document.querySelectorAll(".tab-btn");
