@@ -33,24 +33,23 @@ let currentPage = 1;
 const catsPerPage = 10;
 let totalPages = 1;
 
-// Get auth token
-function getToken() {
-  return localStorage.getItem("token");
-}
-
-// Auth headers
-function authHeaders() {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${getToken()}`,
-  };
+// Check if user is authenticated via session cookie
+async function checkAuth() {
+  try {
+    const response = await fetch("/auth/me", {
+      credentials: "include",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Initialize
 document.addEventListener("DOMContentLoaded", async () => {
-  // Check if user is logged in
-  const token = getToken();
-  if (!token) {
+  // Check if user is logged in via session cookie
+  const isAuthenticated = await checkAuth();
+  if (!isAuthenticated) {
     window.location.href = "login.html";
     return;
   }
@@ -85,8 +84,15 @@ function closeSidebar() {
 }
 
 // Logout function
-function logout() {
-  localStorage.removeItem("token");
+async function logout() {
+  try {
+    await fetch("/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
   localStorage.removeItem("user");
   window.location.href = "login.html";
 }
@@ -242,7 +248,8 @@ async function handleFormSubmit(e) {
 
       const response = await fetch(`${API_URL}/${catId}`, {
         method: "PUT",
-        headers: authHeaders(),
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(updateData),
       });
 
@@ -254,7 +261,8 @@ async function handleFormSubmit(e) {
 
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: authHeaders(),
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(postData),
       });
 
@@ -294,7 +302,7 @@ async function deleteCat(id) {
   try {
     const response = await fetch(`${API_URL}/${id}`, {
       method: "DELETE",
-      headers: authHeaders(),
+      credentials: "include",
     });
 
     if (!response.ok) throw new Error("Failed to delete cat");
@@ -313,7 +321,7 @@ async function deleteCat(id) {
 async function loadAdoptions() {
   try {
     const response = await fetch(ADOPTIONS_URL, {
-      headers: authHeaders(),
+      credentials: "include",
     });
 
     if (!response.ok) throw new Error("Failed to fetch adoptions");
@@ -333,7 +341,8 @@ async function adoptCat(catId) {
   try {
     const response = await fetch(ADOPTIONS_URL, {
       method: "POST",
-      headers: authHeaders(),
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ cat_id: catId }),
     });
 
@@ -356,7 +365,7 @@ async function unadoptCat(catId) {
   try {
     const response = await fetch(`${ADOPTIONS_URL}/${catId}`, {
       method: "DELETE",
-      headers: authHeaders(),
+      credentials: "include",
     });
 
     if (!response.ok) throw new Error("Failed to remove adoption");

@@ -1,14 +1,21 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { jwt, sign, verify } from "hono/jwt";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 
 const app = new Hono();
 
-// CORS middleware
-app.use("/*", cors());
+// CORS middleware - allow credentials for cookies
+app.use(
+  "/*",
+  cors({
+    origin: (origin) => origin || "*",
+    credentials: true,
+  })
+);
 
-// JWT Secret
-const getJwtSecret = (c) => c.env.JWT_SECRET || "default-secret-change-me";
+// Session configuration
+const SESSION_COOKIE_NAME = "session_id";
+const SESSION_DURATION_DAYS = 7;
 
 // Simple password hashing using Web Crypto API (Workers-compatible)
 async function hashPassword(password) {
@@ -24,21 +31,69 @@ async function verifyPassword(password, hash) {
   return passwordHash === hash;
 }
 
-// Auth middleware
+// Generate random session ID
+function generateSessionId() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Create session in database
+async function createSession(db, userId) {
+  const sessionId = generateSessionId();
+  const expiresAt = new Date(
+    Date.now() + SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  await db
+    .prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+    .bind(sessionId, userId, expiresAt)
+    .run();
+
+  return { sessionId, expiresAt };
+}
+
+// Get session from database
+async function getSession(db, sessionId) {
+  if (!sessionId) return null;
+
+  const session = await db
+    .prepare(
+      "SELECT sessions.*, users.id as uid, users.username, users.email FROM sessions JOIN users ON sessions.user_id = users.id WHERE sessions.id = ? AND sessions.expires_at > datetime('now')"
+    )
+    .bind(sessionId)
+    .first();
+
+  return session;
+}
+
+// Delete session
+async function deleteSession(db, sessionId) {
+  if (!sessionId) return;
+  await db.prepare("DELETE FROM sessions WHERE id = ?").bind(sessionId).run();
+}
+
+// Auth middleware - uses cookies instead of JWT
 const authMiddleware = async (c, next) => {
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const sessionId = getCookie(c, SESSION_COOKIE_NAME);
+
+  if (!sessionId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const token = authHeader.split(" ")[1];
-  try {
-    const payload = await verify(token, getJwtSecret(c));
-    c.set("user", payload);
-    await next();
-  } catch (error) {
-    return c.json({ error: "Invalid token" }, 401);
+  const session = await getSession(c.env.DB, sessionId);
+
+  if (!session) {
+    deleteCookie(c, SESSION_COOKIE_NAME);
+    return c.json({ error: "Session expired" }, 401);
   }
+
+  c.set("user", {
+    id: session.uid,
+    username: session.username,
+    email: session.email,
+  });
+  await next();
 };
 
 // ==================== AUTH ROUTES ====================
@@ -98,19 +153,37 @@ app.post("/auth/login", async (c) => {
       return c.json({ error: "Invalid credentials" }, 401);
     }
 
-    const token = await sign(
-      { id: user.id, username: user.username, email: user.email },
-      getJwtSecret(c)
-    );
+    // Create session and set cookie
+    const { sessionId, expiresAt } = await createSession(c.env.DB, user.id);
+
+    setCookie(c, SESSION_COOKIE_NAME, sessionId, {
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+      expires: new Date(expiresAt),
+    });
 
     return c.json({
       message: "Login successful",
-      token,
       user: { id: user.id, username: user.username, email: user.email },
     });
   } catch (error) {
     return c.json({ error: "Server error", details: error.message }, 500);
   }
+});
+
+// Logout
+app.post("/auth/logout", async (c) => {
+  const sessionId = getCookie(c, SESSION_COOKIE_NAME);
+
+  if (sessionId) {
+    await deleteSession(c.env.DB, sessionId);
+  }
+
+  deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
+
+  return c.json({ message: "Logged out successfully" });
 });
 
 // Get current user

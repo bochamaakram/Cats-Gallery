@@ -46,6 +46,7 @@ loginForm.addEventListener("submit", async (e) => {
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
 
@@ -58,8 +59,7 @@ loginForm.addEventListener("submit", async (e) => {
 
     showMessage("Login successful! Redirecting...", "success");
 
-    // Store token and user info
-    localStorage.setItem("token", data.token);
+    // Store user info (session is handled by cookie)
     localStorage.setItem("user", JSON.stringify(data.user));
 
     // Redirect to main page after a short delay
@@ -100,6 +100,7 @@ signupForm.addEventListener("submit", async (e) => {
     const response = await fetch(`${API_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ username, email, password }),
     });
 
@@ -116,13 +117,13 @@ signupForm.addEventListener("submit", async (e) => {
     const loginResponse = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
 
     const loginData = await loginResponse.json();
 
     if (loginResponse.ok) {
-      localStorage.setItem("token", loginData.token);
       localStorage.setItem("user", JSON.stringify(loginData.user));
       setTimeout(() => {
         window.location.href = "index.html";
