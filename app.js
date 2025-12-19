@@ -252,6 +252,103 @@ app.delete("/cats/:id", authMiddleware, async (c) => {
   }
 });
 
+// ==================== ADOPTIONS ROUTES ====================
+
+// Get user's adopted cats
+app.get("/adoptions", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+
+    const adoptions = await c.env.DB.prepare(
+      `
+      SELECT cats.*, adoptions.adopted_at 
+      FROM adoptions 
+      JOIN cats ON adoptions.cat_id = cats.id 
+      WHERE adoptions.user_id = ?
+      ORDER BY adoptions.adopted_at DESC
+    `
+    )
+      .bind(user.id)
+      .all();
+
+    return c.json({ adoptions: adoptions.results });
+  } catch (error) {
+    return c.json({ error: "Server error", details: error.message }, 500);
+  }
+});
+
+// Adopt a cat
+app.post("/adoptions", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const body = await c.req.json();
+    const { cat_id } = body;
+
+    if (!cat_id) {
+      return c.json({ error: "cat_id is required" }, 400);
+    }
+
+    // Check if cat exists
+    const cat = await c.env.DB.prepare("SELECT * FROM cats WHERE id = ?")
+      .bind(cat_id)
+      .first();
+
+    if (!cat) {
+      return c.json({ error: "Cat not found" }, 404);
+    }
+
+    // Check if already adopted by this user
+    const existing = await c.env.DB.prepare(
+      "SELECT * FROM adoptions WHERE user_id = ? AND cat_id = ?"
+    )
+      .bind(user.id, cat_id)
+      .first();
+
+    if (existing) {
+      return c.json({ error: "You have already adopted this cat" }, 409);
+    }
+
+    const result = await c.env.DB.prepare(
+      "INSERT INTO adoptions (user_id, cat_id) VALUES (?, ?)"
+    )
+      .bind(user.id, cat_id)
+      .run();
+
+    return c.json(
+      {
+        message: "Cat adopted successfully!",
+        id: result.meta.last_row_id,
+        cat,
+      },
+      201
+    );
+  } catch (error) {
+    return c.json({ error: "Server error", details: error.message }, 500);
+  }
+});
+
+// Remove adoption
+app.delete("/adoptions/:catId", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const catId = c.req.param("catId");
+
+    const result = await c.env.DB.prepare(
+      "DELETE FROM adoptions WHERE user_id = ? AND cat_id = ?"
+    )
+      .bind(user.id, catId)
+      .run();
+
+    if (result.meta.changes === 0) {
+      return c.json({ error: "Adoption not found" }, 404);
+    }
+
+    return c.json({ message: "Adoption removed successfully" });
+  } catch (error) {
+    return c.json({ error: "Server error", details: error.message }, 500);
+  }
+});
+
 // Health check
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });

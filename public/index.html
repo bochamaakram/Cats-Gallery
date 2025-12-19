@@ -31,20 +31,37 @@
         </nav>
       </header>
 
-      <!-- Cats Grid -->
-      <div id="cats-container" class="cats-grid">
-        <div class="loading">Loading cats...</div>
-      </div>
+      <!-- Main Layout with Sidebar -->
+      <div class="main-layout">
+        <!-- Main Content -->
+        <div class="main-content">
+          <!-- Cats Grid -->
+          <div id="cats-container" class="cats-grid">
+            <div class="loading">Loading cats...</div>
+          </div>
 
-      <!-- Pagination -->
-      <div class="pagination" id="pagination">
-        <button class="btn pagination-btn" id="prev-btn" disabled>
-          ← Previous
-        </button>
-        <span class="page-info" id="page-info">Page 1 of 1</span>
-        <button class="btn pagination-btn" id="next-btn" disabled>
-          Next →
-        </button>
+          <!-- Pagination -->
+          <div class="pagination" id="pagination">
+            <button class="btn pagination-btn" id="prev-btn" disabled>
+              ← Previous
+            </button>
+            <span class="page-info" id="page-info">Page 1 of 1</span>
+            <button class="btn pagination-btn" id="next-btn" disabled>
+              Next →
+            </button>
+          </div>
+        </div>
+
+        <!-- Adopted Cats Sidebar -->
+        <aside class="adoption-sidebar" id="adoption-sidebar">
+          <div class="sidebar-header">
+            <h3>🏠 My Adopted Cats</h3>
+            <span class="adoption-count" id="adoption-count">0</span>
+          </div>
+          <div class="adopted-cats-list" id="adopted-cats-list">
+            <div class="empty-sidebar">No cats adopted yet</div>
+          </div>
+        </aside>
       </div>
     </div>
 

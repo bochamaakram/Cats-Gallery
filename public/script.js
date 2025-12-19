@@ -1,5 +1,6 @@
 // API Base URL
 const API_URL = "/cats";
+const ADOPTIONS_URL = "/adoptions";
 
 // DOM Elements
 const catForm = document.getElementById("cat-form");
@@ -17,10 +18,13 @@ const prevBtn = document.getElementById("prev-btn");
 const nextBtn = document.getElementById("next-btn");
 const pageInfo = document.getElementById("page-info");
 const logoutBtn = document.getElementById("logout-btn");
+const adoptedCatsList = document.getElementById("adopted-cats-list");
+const adoptionCount = document.getElementById("adoption-count");
 
 // State
 let isEditing = false;
 let allCats = [];
+let adoptedCats = [];
 let currentPage = 1;
 const catsPerPage = 10;
 let totalPages = 1;
@@ -39,13 +43,14 @@ function authHeaders() {
 }
 
 // Initialize
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   // Check if user is logged in
   const token = getToken();
   if (!token) {
     window.location.href = "login.html";
     return;
   }
+  await loadAdoptions();
   loadCats();
 });
 
@@ -161,8 +166,11 @@ function renderCats(cats) {
     return;
   }
 
+  const adoptedIds = adoptedCats.map((c) => c.id);
+
   catsContainer.innerHTML = cats
     .map((cat) => {
+      const isAdopted = adoptedIds.includes(cat.id);
       return `
         <div class="cat-card" data-id="${cat.id}">
             ${
@@ -175,6 +183,13 @@ function renderCats(cats) {
             <div class="cat-info">
                 <h3 class="cat-name">${escapeHtml(cat.name)}</h3>
                 <div class="cat-actions">
+                    <button class="btn btn-adopt ${isAdopted ? "adopted" : ""}" 
+                            onclick="${isAdopted ? "" : `adoptCat(${cat.id})`}"
+                            ${isAdopted ? "disabled" : ""}>
+                        ${isAdopted ? "Adopted ✓" : "Adopt 🏠"}
+                    </button>
+                </div>
+                <div class="cat-actions" style="margin-top: 8px;">
                     <button class="btn" onclick="editCat(${
                       cat.id
                     })">Edit</button>
@@ -272,6 +287,108 @@ async function deleteCat(id) {
     console.error("Error:", error);
     showToast("Failed to delete cat", "error");
   }
+}
+
+// ==================== ADOPTIONS ====================
+
+// Load user's adoptions
+async function loadAdoptions() {
+  try {
+    const response = await fetch(ADOPTIONS_URL, {
+      headers: authHeaders(),
+    });
+
+    if (!response.ok) throw new Error("Failed to fetch adoptions");
+
+    const data = await response.json();
+    adoptedCats = data.adoptions || [];
+    renderSidebar();
+  } catch (error) {
+    console.error("Error loading adoptions:", error);
+    adoptedCats = [];
+    renderSidebar();
+  }
+}
+
+// Adopt a cat
+async function adoptCat(catId) {
+  try {
+    const response = await fetch(ADOPTIONS_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ cat_id: catId }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Failed to adopt cat");
+    }
+
+    showToast("Cat adopted successfully! 🎉", "success");
+    await loadAdoptions();
+    renderCurrentView();
+  } catch (error) {
+    console.error("Error adopting cat:", error);
+    showToast(error.message || "Failed to adopt cat", "error");
+  }
+}
+
+// Remove adoption
+async function unadoptCat(catId) {
+  try {
+    const response = await fetch(`${ADOPTIONS_URL}/${catId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    if (!response.ok) throw new Error("Failed to remove adoption");
+
+    showToast("Adoption removed", "success");
+    await loadAdoptions();
+    renderCurrentView();
+  } catch (error) {
+    console.error("Error removing adoption:", error);
+    showToast("Failed to remove adoption", "error");
+  }
+}
+
+// Render sidebar with adopted cats
+function renderSidebar() {
+  adoptionCount.textContent = adoptedCats.length;
+
+  if (adoptedCats.length === 0) {
+    adoptedCatsList.innerHTML =
+      '<div class="empty-sidebar">No cats adopted yet</div>';
+    return;
+  }
+
+  adoptedCatsList.innerHTML = adoptedCats
+    .map((cat) => {
+      const adoptDate = cat.adopted_at
+        ? new Date(cat.adopted_at).toLocaleDateString()
+        : "";
+      return `
+        <div class="adopted-cat-item" data-id="${cat.id}">
+          ${
+            cat.pfp
+              ? `<img src="${cat.pfp}" alt="${escapeHtml(
+                  cat.name
+                )}" class="adopted-cat-thumb" onerror="this.outerHTML='<div class=\\'adopted-cat-thumb placeholder\\'>🐱</div>'">`
+              : '<div class="adopted-cat-thumb placeholder">🐱</div>'
+          }
+          <div class="adopted-cat-info">
+            <div class="adopted-cat-name">${escapeHtml(cat.name)}</div>
+            <div class="adopted-cat-date">Adopted ${adoptDate}</div>
+          </div>
+          <button class="btn-remove-adoption" onclick="unadoptCat(${
+            cat.id
+          })" title="Remove adoption">
+            ✕
+          </button>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 // Show toast notification
