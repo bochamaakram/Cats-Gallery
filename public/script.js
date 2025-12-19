@@ -195,7 +195,7 @@ function renderCats(cats) {
               cat.pfp
                 ? `<img src="${cat.pfp}" alt="${escapeHtml(
                     cat.name
-                  )}" class="cat-image" onerror="this.outerHTML='<div class=\\'cat-image placeholder\\'>🐱</div>'">`
+                  )}" class="cat-image" loading="lazy" onerror="this.outerHTML='<div class=\\'cat-image placeholder\\'>🐱</div>'">`
                 : '<div class="cat-image placeholder">🐱</div>'
             }
             <div class="cat-info">
@@ -391,7 +391,7 @@ function renderSidebar() {
             cat.pfp
               ? `<img src="${cat.pfp}" alt="${escapeHtml(
                   cat.name
-                )}" class="adopted-cat-thumb" onerror="this.outerHTML='<div class=\\'adopted-cat-thumb placeholder\\'>🐱</div>'">`
+                )}" class="adopted-cat-thumb" loading="lazy" onerror="this.outerHTML='<div class=\\'adopted-cat-thumb placeholder\\'>🐱</div>'">`
               : '<div class="adopted-cat-thumb placeholder">🐱</div>'
           }
           <div class="adopted-cat-info">
