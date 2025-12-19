@@ -25,6 +25,10 @@
             />
           </div>
           <div class="header-actions">
+            <button class="btn btn-adoptions" id="toggle-sidebar-btn">
+              🏠 My Adoptions
+              <span class="adoption-badge" id="adoption-badge">0</span>
+            </button>
             <button class="btn btn-add" id="add-cat-btn">Add Cat</button>
             <button class="btn btn-logout" id="logout-btn">Logout</button>
           </div>
@@ -51,12 +55,14 @@
             </button>
           </div>
         </div>
+        <!-- Sidebar Overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
         <!-- Adopted Cats Sidebar -->
         <aside class="adoption-sidebar" id="adoption-sidebar">
           <div class="sidebar-header">
             <h3>🏠 My Adopted Cats</h3>
-            <span class="adoption-count" id="adoption-count">0</span>
+            <button class="btn-close-sidebar" id="close-sidebar-btn">✕</button>
           </div>
           <div class="adopted-cats-list" id="adopted-cats-list">
             <div class="empty-sidebar">No cats adopted yet</div>

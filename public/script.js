@@ -19,7 +19,11 @@ const nextBtn = document.getElementById("next-btn");
 const pageInfo = document.getElementById("page-info");
 const logoutBtn = document.getElementById("logout-btn");
 const adoptedCatsList = document.getElementById("adopted-cats-list");
-const adoptionCount = document.getElementById("adoption-count");
+const adoptionBadge = document.getElementById("adoption-badge");
+const toggleSidebarBtn = document.getElementById("toggle-sidebar-btn");
+const closeSidebarBtn = document.getElementById("close-sidebar-btn");
+const adoptionSidebar = document.getElementById("adoption-sidebar");
+const sidebarOverlay = document.getElementById("sidebar-overlay");
 
 // State
 let isEditing = false;
@@ -65,6 +69,20 @@ searchInput.addEventListener("input", handleSearch);
 prevBtn.addEventListener("click", () => changePage(-1));
 nextBtn.addEventListener("click", () => changePage(1));
 logoutBtn.addEventListener("click", logout);
+toggleSidebarBtn.addEventListener("click", toggleSidebar);
+closeSidebarBtn.addEventListener("click", closeSidebar);
+sidebarOverlay.addEventListener("click", closeSidebar);
+
+// Toggle sidebar visibility
+function toggleSidebar() {
+  adoptionSidebar.classList.toggle("visible");
+  sidebarOverlay.classList.toggle("visible");
+}
+
+function closeSidebar() {
+  adoptionSidebar.classList.remove("visible");
+  sidebarOverlay.classList.remove("visible");
+}
 
 // Logout function
 function logout() {
@@ -354,7 +372,7 @@ async function unadoptCat(catId) {
 
 // Render sidebar with adopted cats
 function renderSidebar() {
-  adoptionCount.textContent = adoptedCats.length;
+  adoptionBadge.textContent = adoptedCats.length;
 
   if (adoptedCats.length === 0) {
     adoptedCatsList.innerHTML =

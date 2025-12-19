@@ -36,17 +36,67 @@ body {
 
 /* Adoption Sidebar */
 .adoption-sidebar {
-  width: 280px;
+  width: 300px;
   flex-shrink: 0;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 16px;
   height: fit-content;
-  position: sticky;
-  top: 20px;
-  max-height: calc(100vh - 160px);
+  position: fixed;
+  right: -320px;
+  top: 80px;
+  max-height: calc(100vh - 100px);
   overflow-y: auto;
+  transition: right 0.3s ease;
+  z-index: 100;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.adoption-sidebar.visible {
+  right: 20px;
+}
+
+/* Adoptions Toggle Button */
+.btn-adoptions {
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+  color: white;
+  border: none;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-adoptions:hover {
+  background: linear-gradient(135deg, #ff5252, #ff7043);
+}
+
+.adoption-badge {
+  background: white;
+  color: #ff6b6b;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Sidebar Overlay */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 99;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .sidebar-header {
@@ -63,6 +113,20 @@ body {
   font-weight: 600;
   color: #333;
   margin: 0;
+}
+
+.btn-close-sidebar {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.2s;
+}
+
+.btn-close-sidebar:hover {
+  color: #333;
 }
 
 .adoption-count {
