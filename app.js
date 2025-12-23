@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { sign, verify } from "hono/jwt";
 
 const app = new Hono();
 
@@ -16,7 +15,7 @@ app.use(
 
 // Session configuration
 const SESSION_COOKIE_NAME = "session_id";
-const JWT_SECRET = "super-secret-key-change-this"; // In production, use env var
+const SESSION_DURATION_DAYS = 7;
 
 // Simple password hashing using Web Crypto API (Workers-compatible)
 async function hashPassword(password) {
@@ -32,25 +31,70 @@ async function verifyPassword(password, hash) {
   return passwordHash === hash;
 }
 
-// Auth middleware - uses JWT
-const authMiddleware = async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE_NAME);
+// Generate random session ID
+function generateSessionId() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
-  if (!token) {
+// Create session in database
+async function createSession(db, userId) {
+  const sessionId = generateSessionId();
+  const expiresAt = new Date(
+    Date.now() + SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  await db
+    .prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+    .bind(sessionId, userId, expiresAt)
+    .run();
+
+  return { sessionId, expiresAt };
+}
+
+// Get session from database
+async function getSession(db, sessionId) {
+  if (!sessionId) return null;
+
+  const session = await db
+    .prepare(
+      "SELECT sessions.*, users.id as uid, users.username, users.email FROM sessions JOIN users ON sessions.user_id = users.id WHERE sessions.id = ? AND sessions.expires_at > datetime('now')"
+    )
+    .bind(sessionId)
+    .first();
+
+  return session;
+}
+
+// Delete session
+async function deleteSession(db, sessionId) {
+  if (!sessionId) return;
+  await db.prepare("DELETE FROM sessions WHERE id = ?").bind(sessionId).run();
+}
+
+// Auth middleware - uses cookies instead of JWT
+const authMiddleware = async (c, next) => {
+  const sessionId = getCookie(c, SESSION_COOKIE_NAME);
+
+  if (!sessionId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  try {
-    const payload = await verify(token, c.env.JWT_SECRET || JWT_SECRET);
-    c.set("user", payload);
-    await next();
-  } catch (err) {
+  const session = await getSession(c.env.DB, sessionId);
+
+  if (!session) {
     deleteCookie(c, SESSION_COOKIE_NAME);
-    return c.json({ error: "Invalid token" }, 401);
+    return c.json({ error: "Session expired" }, 401);
   }
+
+  c.set("user", {
+    id: session.uid,
+    username: session.username,
+    email: session.email,
+  });
+  await next();
 };
-
-
 
 // ==================== AUTH ROUTES ====================
 
@@ -109,22 +153,15 @@ app.post("/auth/login", async (c) => {
       return c.json({ error: "Invalid credentials" }, 401);
     }
 
-    // Generate JWT
-    const payload = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
-    };
+    // Create session and set cookie
+    const { sessionId, expiresAt } = await createSession(c.env.DB, user.id);
 
-    const token = await sign(payload, c.env.JWT_SECRET || JWT_SECRET);
-
-    setCookie(c, SESSION_COOKIE_NAME, token, {
+    setCookie(c, SESSION_COOKIE_NAME, sessionId, {
       path: "/",
       httpOnly: true,
       secure: true,
       sameSite: "Lax",
-      maxAge: 7 * 24 * 60 * 60,
+      expires: new Date(expiresAt),
     });
 
     return c.json({
@@ -138,7 +175,11 @@ app.post("/auth/login", async (c) => {
 
 // Logout
 app.post("/auth/logout", async (c) => {
+  const sessionId = getCookie(c, SESSION_COOKIE_NAME);
 
+  if (sessionId) {
+    await deleteSession(c.env.DB, sessionId);
+  }
 
   deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
 
