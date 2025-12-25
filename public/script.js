@@ -33,11 +33,20 @@ let currentPage = 1;
 const catsPerPage = 10;
 let totalPages = 1;
 
-// Check if user is authenticated via session cookie
+// Get auth headers with JWT token
+function getAuthHeaders() {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// Check if user is authenticated via JWT token
 async function checkAuth() {
+  const token = localStorage.getItem("token");
+  if (!token) return false;
+
   try {
     const response = await fetch("/auth/me", {
-      credentials: "include",
+      headers: getAuthHeaders(),
     });
     return response.ok;
   } catch {
@@ -88,11 +97,12 @@ async function logout() {
   try {
     await fetch("/auth/logout", {
       method: "POST",
-      credentials: "include",
+      headers: getAuthHeaders(),
     });
   } catch (error) {
     console.error("Logout error:", error);
   }
+  localStorage.removeItem("token");
   localStorage.removeItem("user");
   window.location.href = "login.html";
 }
@@ -197,13 +207,12 @@ function renderCats(cats) {
       const isAdopted = adoptedIds.includes(cat.id);
       return `
         <div class="cat-card" data-id="${cat.id}">
-            ${
-              cat.pfp
-                ? `<img src="${cat.pfp}" alt="${escapeHtml(
-                    cat.name
-                  )}" class="cat-image" loading="lazy" onerror="this.outerHTML='<div class=\\'cat-image placeholder\\'>🐱</div>'">`
-                : '<div class="cat-image placeholder">🐱</div>'
-            }
+            ${cat.pfp
+          ? `<img src="${cat.pfp}" alt="${escapeHtml(
+            cat.name
+          )}" class="cat-image" loading="lazy" onerror="this.outerHTML='<div class=\\'cat-image placeholder\\'>🐱</div>'">`
+          : '<div class="cat-image placeholder">🐱</div>'
+        }
             <div class="cat-info">
                 <h3 class="cat-name">${escapeHtml(cat.name)}</h3>
                 <div class="cat-actions">
@@ -214,12 +223,10 @@ function renderCats(cats) {
                     </button>
                 </div>
                 <div class="cat-actions" style="margin-top: 8px;">
-                    <button class="btn" onclick="editCat(${
-                      cat.id
-                    })">Edit</button>
-                    <button class="btn" onclick="deleteCat(${
-                      cat.id
-                    })">Delete</button>
+                    <button class="btn" onclick="editCat(${cat.id
+        })">Edit</button>
+                    <button class="btn" onclick="deleteCat(${cat.id
+        })">Delete</button>
                 </div>
             </div>
         </div>
@@ -248,8 +255,7 @@ async function handleFormSubmit(e) {
 
       const response = await fetch(`${API_URL}/${catId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(updateData),
       });
 
@@ -261,8 +267,7 @@ async function handleFormSubmit(e) {
 
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(postData),
       });
 
@@ -302,7 +307,7 @@ async function deleteCat(id) {
   try {
     const response = await fetch(`${API_URL}/${id}`, {
       method: "DELETE",
-      credentials: "include",
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) throw new Error("Failed to delete cat");
@@ -321,7 +326,7 @@ async function deleteCat(id) {
 async function loadAdoptions() {
   try {
     const response = await fetch(ADOPTIONS_URL, {
-      credentials: "include",
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) throw new Error("Failed to fetch adoptions");
@@ -341,8 +346,7 @@ async function adoptCat(catId) {
   try {
     const response = await fetch(ADOPTIONS_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ cat_id: catId }),
     });
 
@@ -365,7 +369,7 @@ async function unadoptCat(catId) {
   try {
     const response = await fetch(`${ADOPTIONS_URL}/${catId}`, {
       method: "DELETE",
-      credentials: "include",
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) throw new Error("Failed to remove adoption");
@@ -396,20 +400,18 @@ function renderSidebar() {
         : "";
       return `
         <div class="adopted-cat-item" data-id="${cat.id}">
-          ${
-            cat.pfp
-              ? `<img src="${cat.pfp}" alt="${escapeHtml(
-                  cat.name
-                )}" class="adopted-cat-thumb" loading="lazy" onerror="this.outerHTML='<div class=\\'adopted-cat-thumb placeholder\\'>🐱</div>'">`
-              : '<div class="adopted-cat-thumb placeholder">🐱</div>'
-          }
+          ${cat.pfp
+          ? `<img src="${cat.pfp}" alt="${escapeHtml(
+            cat.name
+          )}" class="adopted-cat-thumb" loading="lazy" onerror="this.outerHTML='<div class=\\'adopted-cat-thumb placeholder\\'>🐱</div>'">`
+          : '<div class="adopted-cat-thumb placeholder">🐱</div>'
+        }
           <div class="adopted-cat-info">
             <div class="adopted-cat-name">${escapeHtml(cat.name)}</div>
             <div class="adopted-cat-date">Adopted ${adoptDate}</div>
           </div>
-          <button class="btn-remove-adoption" onclick="unadoptCat(${
-            cat.id
-          })" title="Remove adoption">
+          <button class="btn-remove-adoption" onclick="unadoptCat(${cat.id
+        })" title="Remove adoption">
             ✕
           </button>
         </div>

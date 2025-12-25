@@ -59,7 +59,8 @@ loginForm.addEventListener("submit", async (e) => {
 
     showMessage("Login successful! Redirecting...", "success");
 
-    // Store user info (session is handled by cookie)
+    // Store JWT token and user info
+    localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
 
     // Redirect to main page after a short delay
@@ -124,6 +125,7 @@ signupForm.addEventListener("submit", async (e) => {
     const loginData = await loginResponse.json();
 
     if (loginResponse.ok) {
+      localStorage.setItem("token", loginData.token);
       localStorage.setItem("user", JSON.stringify(loginData.user));
       setTimeout(() => {
         window.location.href = "index.html";
